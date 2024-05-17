@@ -7,83 +7,59 @@ public class Encryption
 {
     public static RSAParameters _publicKey;
     private static RSAParameters _privateKey;
+    private static RSA _rsa = RSA.Create();
 
     public static void GenerateKeys()
     {
-        using RSA rsa = RSA.Create();
-        _publicKey = rsa.ExportParameters(false);
-        _privateKey = rsa.ExportParameters(true);
+        _publicKey = _rsa.ExportParameters(false);
+        _privateKey = _rsa.ExportParameters(true);
     }
 
     public static byte[] Encrypt(string plainText)
     {
-        byte[] encryptedBytes;
-        using (RSA rsa = RSA.Create())
-        {
-            rsa.ImportParameters(_publicKey);
-            byte[] plainBytes = Encoding.UTF8.GetBytes(plainText);
-            encryptedBytes = rsa.Encrypt(plainBytes, RSAEncryptionPadding.Pkcs1);
-        }
-
-        return encryptedBytes;
+        using var rsa = RSA.Create();
+        rsa.ImportParameters(_publicKey);
+        var plainBytes = Encoding.UTF8.GetBytes(plainText);
+        return rsa.Encrypt(plainBytes, RSAEncryptionPadding.Pkcs1);
     }
 
     public static byte[] Encrypt(string plainText, RSAParameters publicKey)
     {
-        byte[] encryptedBytes;
-        using (RSA rsa = RSA.Create())
-        {
-            rsa.ImportParameters(publicKey);
-            byte[] plainBytes = Encoding.UTF8.GetBytes(plainText);
-            encryptedBytes = rsa.Encrypt(plainBytes, RSAEncryptionPadding.Pkcs1);
-        }
-
-        return encryptedBytes;
+        using var rsa = RSA.Create();
+        rsa.ImportParameters(publicKey);
+        var plainBytes = Encoding.UTF8.GetBytes(plainText);
+        return rsa.Encrypt(plainBytes, RSAEncryptionPadding.Pkcs1);
     }
 
     public static string Decrypt(byte[] encryptedBytes)
     {
-        string decryptedText;
-        using (RSA rsa = RSA.Create())
-        {
-            rsa.ImportParameters(_privateKey);
-            byte[] decryptedBytes = rsa.Decrypt(encryptedBytes, RSAEncryptionPadding.Pkcs1);
-            decryptedText = Encoding.UTF8.GetString(decryptedBytes);
-        }
-
-        return decryptedText;
+        using var rsa = RSA.Create();
+        rsa.ImportParameters(_privateKey);
+        var decryptedBytes = rsa.Decrypt(encryptedBytes, RSAEncryptionPadding.Pkcs1);
+        return Encoding.UTF8.GetString(decryptedBytes);
     }
 
     public static string Decrypt(byte[] encryptedBytes, RSAParameters privateKey)
     {
-        string decryptedText;
-        using (RSA rsa = RSA.Create())
-        {
-            rsa.ImportParameters(privateKey);
-            byte[] decryptedBytes = rsa.Decrypt(encryptedBytes, RSAEncryptionPadding.Pkcs1);
-            decryptedText = Encoding.UTF8.GetString(decryptedBytes);
-        }
-
-        return decryptedText;
+        using var rsa = RSA.Create();
+        rsa.ImportParameters(privateKey);
+        var decryptedBytes = rsa.Decrypt(encryptedBytes, RSAEncryptionPadding.Pkcs1);
+        return Encoding.UTF8.GetString(decryptedBytes);
     }
 
     public static string GetPublicKeyAsString(RSAParameters publicKey)
     {
-        using (RSA rsa = RSA.Create())
-        {
-            rsa.ImportParameters(publicKey);
-            byte[] publicKeyBytes = rsa.ExportRSAPublicKey();
-            return Convert.ToBase64String(publicKeyBytes);
-        }
+        using var rsa = RSA.Create();
+        rsa.ImportParameters(publicKey);
+        var publicKeyBytes = rsa.ExportRSAPublicKey();
+        return Convert.ToBase64String(publicKeyBytes);
     }
 
     public static RSAParameters ConvertToPublicKey(string publicKeyString)
     {
-        byte[] publicKeyBytes = Convert.FromBase64String(publicKeyString);
-        using (RSA rsa = RSA.Create())
-        {
-            rsa.ImportRSAPublicKey(publicKeyBytes, out _);
-            return rsa.ExportParameters(false);
-        }
+        var publicKeyBytes = Convert.FromBase64String(publicKeyString);
+        using var rsa = RSA.Create();
+        rsa.ImportRSAPublicKey(publicKeyBytes, out _);
+        return rsa.ExportParameters(false);
     }
 }

@@ -10,14 +10,14 @@ internal class Program
     private static List<Models.Client> _clients = new();
 
 
-    public static async Task Main(string[] args)
+    public static async Task Main()
     {
         Encryption.GenerateKeys();
         _connection = new HubConnectionBuilder()
             .WithUrl("http://localhost:5011/chatHub")
             .Build();
 
-        _connection.Closed += async (error) =>
+        _connection.Closed += async (_) =>
         {
             await Task.Delay(new Random().Next(0, 5) * 1000);
             await _connection.StartAsync();
@@ -26,15 +26,17 @@ internal class Program
         await ConnectAsync();
 
         Console.WriteLine("Enter your nickname");
-        string nickName = Console.ReadLine();
+        var nickName = Console.ReadLine();
 
         await GetNickName(nickName);
-        await _connection.InvokeAsync("GetUsers");
+        await _connection.InvokeAsync(nameof(MethodNames.GetUsers));
 
         while (true)
         {
-            string input = Console.ReadLine();
-            string[] arguments = input.Split(" ");
+            var input = Console.ReadLine();
+            if (string.IsNullOrEmpty(input))
+                continue;
+            var arguments = input.Split(" ");
             switch (arguments[0])
             {
                 case "/exit":
@@ -47,7 +49,7 @@ internal class Program
                     break;
                 case "/getusers":
                     Console.WriteLine("Getting users...");
-                    await _connection.InvokeAsync("GetUsers");
+                    await _connection.InvokeAsync(nameof(MethodNames.GetUsers));
                     break;
                 case "/pm":
                     if (arguments.Length < 3)
@@ -56,9 +58,9 @@ internal class Program
                         break;
                     }
 
-                    string userName = arguments[1];
-                    string msg = string.Join(" ", arguments.Skip(2));
-                    await SendPM(userName, msg);
+                    var userName = arguments[1];
+                    var msg = string.Join(" ", arguments.Skip(2));
+                    await SendPrivateMessage(userName, msg);
                     break;
                 case "/help":
                     PrintHelp();
@@ -74,17 +76,19 @@ internal class Program
 
     private static void PrintHelp()
     {
-        Console.WriteLine("\n=======Commands=======");
-        Console.WriteLine("/exit - Exit the application");
-        Console.WriteLine("/getusers - Get all users");
-        Console.WriteLine("/pm <user> <message> - Send a private message to a user");
+        Console.WriteLine("""
+                          =======Commands=======
+                          /exit - Exit the applicatio
+                          /getusers - Get all users
+                          /pm <user> <message> - Send a private message to a user
+                          """);
     }
 
     private static async Task ConnectAsync()
     {
-        _connection.On<string, byte[]>("receiveMessage",
+        _connection.On<string, byte[]>(nameof(MethodNames.ReceiveMessage),
             (user, message) => { Console.WriteLine($"\n[{DateTime.Now:T}] {user}: {Encryption.Decrypt(message)}"); });
-        _connection.On<string, List<Models.Client>>("clientJoined",
+        _connection.On<string, List<Models.Client>>(nameof(MethodNames.ClientJoined),
             (userName, clients) =>
             {
                 _clients = clients;
@@ -92,13 +96,13 @@ internal class Program
                 Console.WriteLine($"\n[{DateTime.Now:T}] {userName} joined");
             });
 
-        _connection.On<List<Models.Client>>("getUsers", (clients) =>
+        _connection.On<List<Models.Client>>(nameof(MethodNames.GetUsers), (clients) =>
         {
             _clients = clients;
-            Console.WriteLine($"\n========Clients:========{clients.Count}");
-            foreach (Models.Client client in clients)
+            Console.WriteLine($"\n========Clients:======== Total Count:{clients.Count}");
+            foreach (var client in clients)
             {
-                Console.WriteLine($"{client.UserName} - {client.PublicKey}");
+                Console.WriteLine($"UserName: {client.UserName}, PublicKey: {client.PublicKey}");
             }
         });
 
@@ -114,46 +118,26 @@ internal class Program
 
     private static async Task GetNickName(string nickName)
     {
-        try
-        {
-            string stringPublicKey = Encryption.GetPublicKeyAsString(Encryption._publicKey);
-            await _connection.InvokeAsync("GetNickName", nickName, stringPublicKey);
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine($"Exception: {e}");
-        }
+        var stringPublicKey = Encryption.GetPublicKeyAsString(Encryption._publicKey);
+        await _connection.InvokeAsync(nameof(MethodNames.GetNickName), nickName, stringPublicKey);
     }
 
-    private static async Task SendPM(string userName, string msg)
+    private static async Task SendPrivateMessage(string userName, string msg)
     {
-        try
-        {
-            Models.Client? client = _clients.FirstOrDefault(client => client.UserName == userName);
-            await _connection.InvokeAsync("SendPM", client.ConnectionId, Encryption.Encrypt(msg, Encryption.ConvertToPublicKey(client.PublicKey)));
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine($"Exception: {e}");
-        }
+        var client = _clients.FirstOrDefault(client => client.UserName == userName);
+        if (client != null)
+            await _connection.InvokeAsync(nameof(MethodNames.SendPrivateMessage), client.ConnectionId, Encryption.Encrypt(msg, Encryption.ConvertToPublicKey(client.PublicKey)));
     }
 
     private static async void SendEncryptedMessage(string msg)
     {
-        try
+        var encryptMessages = _clients.Select(client => new EncryptMessage
         {
-            List<EncryptMessage> encryptMessages = _clients.Select(client => new EncryptMessage
-            {
-                ConnectionId = client.ConnectionId,
-                UserName = client.UserName,
-                EncryptMsg = Encryption.Encrypt(msg, Encryption.ConvertToPublicKey(client.PublicKey))
-            }).ToList();
+            ConnectionId = client.ConnectionId,
+            UserName = client.UserName,
+            EncryptMsg = Encryption.Encrypt(msg, Encryption.ConvertToPublicKey(client.PublicKey))
+        }).ToList();
 
-            await _connection.InvokeAsync("SendEndcryptMessages", encryptMessages);
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine($"Exception: {e}");
-        }
+        await _connection.InvokeAsync(nameof(MethodNames.SendEndcryptMessages), encryptMessages);
     }
 }

@@ -18,8 +18,27 @@ End-to-End Encrypted  SignalR Chat Application follows the following basic steps
 
 This process ensures end-to-end encryption of messages, creating a secure and confidential communication environment.
 
-<img src="images/screenshot.jpg" />
+## Diagram
 
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U1 as User 1
+    participant S as SignalR Server
+    participant U2 as User 2
+
+    note over U1,U2: Users generate public and private keys.<br>They share public keys with the server for other users to see.
+    Note over U1,U2: User 1 sends a message to User 2
+    U1->>U1: Encrypt message with User 1's private key and User 2's public key
+    U1->>S: Send encrypted message
+    S->>U2: Transmit encrypted message
+    U2->>U2: Decrypt message with User 2's private key
+    U2->>U2: Read message
+```
+
+## Screenshots
+
+<img src="images/screenshot.jpg" />
 
 ## Requirements
 
